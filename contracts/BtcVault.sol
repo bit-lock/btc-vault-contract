@@ -71,7 +71,7 @@ contract BtcVault {
     ) public onlyInitiator(vaultId) isDraft(vaultId) {
         uint256 _totalShare = vaults[vaultId].totalShare;
         for (uint256 i = 0; i < signatories.length; i++) {
-            require(signatoryShares[vaultId].contains(signatories[i]), 'Cannot edit non-existent signatory');
+            require(signatoryShares[vaultId].contains(signatories[i]), 'Non-existent signatory');
             uint256 oldShare = signatoryShares[vaultId].get(signatories[i]);
             uint256 newShare = shares[i];
             _totalShare = _totalShare.sub(oldShare).add(newShare);

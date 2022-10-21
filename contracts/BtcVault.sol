@@ -12,6 +12,8 @@ contract BtcVault {
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeMath for uint256;
 
+    uint256 private constant SHARE_DENOMINATOR = 1e4;
+
     bytes1 private constant DRAFT = 0x00;
     bytes1 private constant FINAL = 0x01;
 
@@ -53,6 +55,7 @@ contract BtcVault {
         uint256[] memory shares
     ) external {
         require(signatories.length == shares.length, 'Mismatch signatories and shares');
+        require(threshold <= SHARE_DENOMINATOR, 'Threshold out of range');
 
         uint256 vaultId = vaults.length;
         Vault memory vault;
@@ -61,7 +64,6 @@ contract BtcVault {
             _addSignatory(vaultId, signatories[i], shares[i]);
             vault.totalShare = vault.totalShare.add(shares[i]);
         }
-        // require(vault.totalShare == 1e18, 'Total share value out of range');
 
         vault.name = name;
         vault.initiator = msg.sender;
@@ -98,6 +100,8 @@ contract BtcVault {
 
     function finalizeVault(uint256 vaultId) external onlyInitiator(vaultId) isDraft(vaultId) {
         require(signatoryShares[vaultId].length() == signatoryPubkeys[vaultId].length(), 'Mismatch shares and pubkeys');
+        require(vaults[vaultId].totalShare == SHARE_DENOMINATOR, 'Total share value out of range');
+
         vaults[vaultId].status = FINAL;
 
         emit Finalized(vaultId);

@@ -59,7 +59,7 @@ describe('BtcVault', () => {
             const name = "Satoshi's Vault"
             const threshold = 30
             const signatories = [signatory1.address, signatory2.address]
-            const shares = [30, 70]
+            const shares = [3000, 7000]
             await btcVault.initializeVault(name, threshold, signatories, shares)
         })
 
@@ -113,7 +113,7 @@ describe('BtcVault', () => {
             const name = "Satoshi's Vault"
             const threshold = 30
             const signatories = [signatory1.address, signatory2.address]
-            const shares = [30, 70]
+            const shares = [3000, 7000]
             await btcVault.initializeVault(name, threshold, signatories, shares)
 
             const vaultId = 0

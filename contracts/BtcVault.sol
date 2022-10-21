@@ -13,9 +13,14 @@ contract BtcVault {
     bytes1 private constant DRAFT = 0x00;
     bytes1 private constant FINAL = 0x01;
 
+    bytes1 private constant PENDING = 0x00;
+    bytes1 private constant ACCEPTED = 0x01;
+
     struct Vault {
         string name;
         address initiator;
+        uint8 threshold;
+        bytes1 status;
         uint256 totalShare;
         uint8 threshold;
         bytes1 status;
@@ -104,6 +109,7 @@ contract BtcVault {
         uint256 share
     ) private {
         signatoryShares[vaultId].set(signatory, share);
+        signatoryVaults[signatory].add(vaultId);
 
         emit Added(vaultId, signatory, share);
     }
@@ -139,6 +145,19 @@ contract BtcVault {
         }
 
         return (signatories, shares, btcPubkeys);
+    }
+
+    function getSignatoryVaults(address signatory) external view returns (uint256[] memory, bytes1[] memory) {
+        uint256[] memory vaultIds = signatoryVaults[signatory].values();
+        bytes1[] memory approveStatus = new bytes1[](vaultIds.length);
+        bytes32 signatoryBytes32 = bytes32(bytes20(signatory));
+
+        for (uint256 i = 0; i < vaultIds.length; i++) {
+            uint256 vaultId = vaultIds[i];
+            approveStatus[i] = signatoryPubkeys[vaultId].contains(signatoryBytes32) ? ACCEPTED : PENDING;
+        }
+
+        return (vaultIds, approveStatus);
     }
 
     /* ========== MODIFIERS ========== */

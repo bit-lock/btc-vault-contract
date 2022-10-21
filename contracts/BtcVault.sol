@@ -3,11 +3,13 @@
 pragma solidity ^0.8.0;
 
 import '@openzeppelin/contracts/utils/structs/EnumerableMap.sol';
+import '@openzeppelin/contracts/utils/structs/EnumerableSet.sol';
 import '@openzeppelin/contracts/utils/math/SafeMath.sol';
 
 contract BtcVault {
     using EnumerableMap for EnumerableMap.Bytes32ToBytes32Map;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
+    using EnumerableSet for EnumerableSet.UintSet;
     using SafeMath for uint256;
 
     bytes1 private constant DRAFT = 0x00;
@@ -22,8 +24,6 @@ contract BtcVault {
         uint8 threshold;
         bytes1 status;
         uint256 totalShare;
-        uint8 threshold;
-        bytes1 status;
     }
 
     /* ========== STATE VARIABLES ========== */
@@ -33,8 +33,11 @@ contract BtcVault {
     mapping(uint256 => EnumerableMap.Bytes32ToBytes32Map) private signatoryPubkeys;
     // vaultId => signatory => share
     mapping(uint256 => EnumerableMap.AddressToUintMap) private signatoryShares;
+    // signatory => vaultId set
+    mapping(address => EnumerableSet.UintSet) private signatoryVaults;
 
     /* ========== EVENTS ========== */
+
     event Initialized(uint256 indexed vaultId, Vault vault);
     event Added(uint256 indexed vaultId, address signatory, uint256 share);
     event Edited(uint256 indexed vaultId, address signatory, uint256 oldShare, uint256 newShare);

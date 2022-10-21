@@ -18,7 +18,7 @@ describe('BtcVault', () => {
     })
 
     it('Initialize vault should work', async () => {
-        const size = 420
+        const size = 220
         const name = "Satoshi's Vault"
         const threshold = 30
         const signatories = Array.from({ length: size }, () => ethers.Wallet.createRandom().address)
@@ -34,16 +34,17 @@ describe('BtcVault', () => {
         expect(vault.threshold).to.eq(threshold)
         expect(vault.status).to.eq('0x00')
         expect(await btcVault.getVaultLength()).to.eq(1)
-        const [vaultSignatories, vaultShares] = await btcVault.getSignatories(vaultId)
+        const [vaultSignatories, vaultShares, vaultPubkeys] = await btcVault.getSignatories(vaultId)
         expect(signatories.length).to.eq(vaultSignatories.length)
         expect(shares.length).to.eq(vaultShares.length)
+        expect(shares.length).to.eq(vaultPubkeys.length)
         for (let i = 0; i < shares.length; i++) {
             expect(signatories[i]).to.eq(vaultSignatories[i])
             expect(shares[i]).to.eq(vaultShares[i])
         }
     })
 
-    it('Initialize vault mismatch data should revert', async () => {
+    it('Initialize vault with mismatch data should revert', async () => {
         const name = "Satoshi's Vault"
         const threshold = 30
         const signatories = Array.from({ length: 2 }, () => ethers.Wallet.createRandom().address)
@@ -64,7 +65,7 @@ describe('BtcVault', () => {
 
         it('Approve by signatory should work', async () => {
             const vaultId = 0
-            const btcPubkey = ethers.constants.HashZero
+            const btcPubkey = ethers.utils.randomBytes(32)
             expect(await btcVault.connect(signatory1).approveSignatory(vaultId, btcPubkey))
                 .to.emit(btcVault, 'Accepted')
                 .withArgs([vaultId, signatory1.address, btcPubkey])
@@ -73,9 +74,17 @@ describe('BtcVault', () => {
                 .withArgs([vaultId, signatory2.address, btcPubkey])
         })
 
-        it('Approve by attacker should revert', async () => {
+        it('Approve with zero hash should revert', async () => {
             const vaultId = 0
             const btcPubkey = ethers.constants.HashZero
+            await expect(btcVault.connect(signatory1).approveSignatory(vaultId, btcPubkey)).revertedWith(
+                'Invalid btcPubkey'
+            )
+        })
+
+        it('Approve by attacker should revert', async () => {
+            const vaultId = 0
+            const btcPubkey = ethers.utils.randomBytes(32)
             await expect(btcVault.connect(attacker).approveSignatory(vaultId, btcPubkey)).revertedWith(
                 'Invalid signatory'
             )
@@ -83,7 +92,7 @@ describe('BtcVault', () => {
 
         it('Approve in FINAL mode should revert', async () => {
             const vaultId = 0
-            const btcPubkey = ethers.constants.HashZero
+            const btcPubkey = ethers.utils.randomBytes(32)
             expect(await btcVault.connect(signatory1).approveSignatory(vaultId, btcPubkey)).to.emit(
                 btcVault,
                 'Accepted'
@@ -108,7 +117,7 @@ describe('BtcVault', () => {
             await btcVault.initializeVault(name, threshold, signatories, shares)
 
             const vaultId = 0
-            const btcPubkey = ethers.constants.HashZero
+            const btcPubkey = ethers.utils.randomBytes(32)
             expect(await btcVault.connect(signatory1).approveSignatory(vaultId, btcPubkey)).to.emit(
                 btcVault,
                 'Accepted'
@@ -117,7 +126,7 @@ describe('BtcVault', () => {
 
         it('Finalize vault by initiator should work', async () => {
             const vaultId = 0
-            const btcPubkey = ethers.constants.HashZero
+            const btcPubkey = ethers.utils.randomBytes(32)
             expect(await btcVault.connect(signatory2).approveSignatory(vaultId, btcPubkey)).to.emit(
                 btcVault,
                 'Accepted'
@@ -136,7 +145,7 @@ describe('BtcVault', () => {
 
         it('Finalize vault in FINAL mode should revert', async () => {
             const vaultId = 0
-            const btcPubkey = ethers.constants.HashZero
+            const btcPubkey = ethers.utils.randomBytes(32)
             expect(await btcVault.connect(signatory2).approveSignatory(vaultId, btcPubkey)).to.emit(
                 btcVault,
                 'Accepted'

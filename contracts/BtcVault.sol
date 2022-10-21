@@ -90,6 +90,7 @@ contract BtcVault {
     }
 
     function approveSignatory(uint256 vaultId, bytes32 btcPubkey) external onlySignatory(vaultId) isDraft(vaultId) {
+        require(btcPubkey != bytes32(0), 'Invalid btcPubkey');
         signatoryPubkeys[vaultId].set(bytes32(bytes20(msg.sender)), btcPubkey);
 
         emit Accepted(vaultId, msg.sender, btcPubkey);

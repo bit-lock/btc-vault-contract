@@ -10,6 +10,7 @@ contract BtcVault {
     using EnumerableMap for EnumerableMap.Bytes32ToBytes32Map;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
     uint256 private constant SHARE_DENOMINATOR = 1e4;
@@ -23,18 +24,27 @@ contract BtcVault {
     struct Vault {
         string name;
         address initiator;
-        uint8 threshold;
+        uint16 threshold;
         bytes1 status;
         uint256 totalShare;
+    }
+
+    struct TimelockThreshold {
+        // The timestamp at which the threshold took effect
+        uint32 timelock;
+        uint16 threshold;
     }
 
     /* ========== STATE VARIABLES ========== */
 
     Vault[] public vaults;
+    TimelockThreshold[] public timelockThresholds;
     // vaultId => signatory => BTC public key
     mapping(uint256 => EnumerableMap.Bytes32ToBytes32Map) private signatoryPubkeys;
     // vaultId => signatory => share
     mapping(uint256 => EnumerableMap.AddressToUintMap) private signatoryShares;
+    // vaultId => authorized address
+    mapping(uint256 => EnumerableSet.AddressSet) private authorizedAddresses;
     // signatory => vaultId set
     mapping(address => EnumerableSet.UintSet) private signatoryVaults;
 
@@ -52,10 +62,13 @@ contract BtcVault {
         string memory name,
         uint8 threshold,
         address[] memory signatories,
-        uint256[] memory shares
+        uint256[] memory shares,
+        address[] memory authorizedAddrList,
+        TimelockThreshold[] memory tsList
     ) external {
         require(signatories.length == shares.length, 'Mismatch signatories and shares');
         require(threshold <= SHARE_DENOMINATOR, 'Threshold out of range');
+        require(tsList.length <= 3, 'Only supports up to 3 timelocks');
 
         uint256 vaultId = vaults.length;
         Vault memory vault;
@@ -63,6 +76,24 @@ contract BtcVault {
         for (uint256 i = 0; i < signatories.length; i++) {
             _addSignatory(vaultId, signatories[i], shares[i]);
             vault.totalShare = vault.totalShare.add(shares[i]);
+        }
+
+        if (tsList.length >= 1) {
+            require(tsList[0].threshold < threshold, 'Invalid threshold');
+            require(tsList[0].timelock > block.timestamp, 'Invalid timelock');
+        }
+        if (tsList.length > 1) {
+            for (uint256 i = 1; i < tsList.length; i++) {
+                require(tsList[i - 1].threshold > tsList[i].threshold, 'Invalid threshold');
+                require(tsList[i - 1].timelock < tsList[i].timelock, 'Invalid timelock');
+            }
+        }
+        for (uint256 i = 0; i < tsList.length; i++) {
+            timelockThresholds.push(tsList[i]);
+        }
+
+        for (uint256 i = 0; i < authorizedAddrList.length; i++) {
+            authorizedAddresses[vaultId].add(authorizedAddrList[i]);
         }
 
         vault.name = name;
@@ -91,6 +122,15 @@ contract BtcVault {
         vaults[vaultId].totalShare = _totalShare;
     }
 
+    function addAuthorizedAddresses(uint256 vaultId, address[] memory authorizedAddrList)
+        external
+        onlyInitiator(vaultId)
+    {
+        for (uint256 i = 0; i < authorizedAddrList.length; i++) {
+            authorizedAddresses[vaultId].add(authorizedAddrList[i]);
+        }
+    }
+
     function approveSignatory(uint256 vaultId, bytes32 btcPubkey) external onlySignatory(vaultId) isDraft(vaultId) {
         require(btcPubkey != bytes32(0), 'Invalid btcPubkey');
         signatoryPubkeys[vaultId].set(bytes32(bytes20(msg.sender)), btcPubkey);
@@ -107,9 +147,9 @@ contract BtcVault {
         emit Finalized(vaultId);
     }
 
-    function initiateWithdrawal() external {}
+    function initiateWithdrawal(uint256 vaultId) external onlyAuthorized(vaultId) {}
 
-    function approveWithdrawal() external {}
+    function approveWithdrawal(uint256 vaultId) external {}
 
     function _addSignatory(
         uint256 vaultId,
@@ -168,6 +208,10 @@ contract BtcVault {
         return (vaultIds, approveStatus);
     }
 
+    function getAuthorizedAddresses(uint256 vaultId) external view returns (address[] memory) {
+        return authorizedAddresses[vaultId].values();
+    }
+
     /* ========== MODIFIERS ========== */
 
     modifier onlyInitiator(uint256 vaultId) {
@@ -177,6 +221,11 @@ contract BtcVault {
 
     modifier onlySignatory(uint256 vaultId) {
         require(signatoryShares[vaultId].contains(msg.sender), 'Invalid signatory');
+        _;
+    }
+
+    modifier onlyAuthorized(uint256 vaultId) {
+        require(authorizedAddresses[vaultId].contains(msg.sender), 'Invalid authorized address');
         _;
     }
 

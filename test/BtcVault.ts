@@ -1,7 +1,8 @@
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
-import { Contract } from 'ethers'
+import { BigNumber, Contract } from 'ethers'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { time } from '@nomicfoundation/hardhat-network-helpers'
 
 describe('BtcVault', () => {
     let initiator: SignerWithAddress
@@ -23,7 +24,14 @@ describe('BtcVault', () => {
         const threshold = 30
         const signatories = Array.from({ length: size }, () => ethers.Wallet.createRandom().address)
         const shares = Array.from({ length: size }, () => Math.floor(Math.random() * 100))
-        expect(await btcVault.initializeVault(name, threshold, signatories, shares))
+        const authorizedAddrList = Array.from({ length: 10 }, () => ethers.Wallet.createRandom().address)
+        const now = await time.latest()
+        const tsList = [
+            [BigNumber.from(now).add(time.duration.days(1)), 20],
+            [BigNumber.from(now).add(time.duration.days(2)), 10],
+            [BigNumber.from(now).add(time.duration.days(3)), 5],
+        ]
+        expect(await btcVault.initializeVault(name, threshold, signatories, shares, authorizedAddrList, tsList))
             .to.emit(btcVault, 'Initialized')
             .withArgs([name, initiator.address, 1, threshold, '0x00'])
 
@@ -49,9 +57,11 @@ describe('BtcVault', () => {
         const threshold = 30
         const signatories = Array.from({ length: 2 }, () => ethers.Wallet.createRandom().address)
         const shares = Array.from({ length: 20 }, () => Math.floor(Math.random() * 100))
-        await expect(btcVault.initializeVault(name, threshold, signatories, shares)).revertedWith(
-            'Mismatch signatories and shares'
-        )
+        const authorizedAddrList: any[] = []
+        const tsList: any[] = []
+        await expect(
+            btcVault.initializeVault(name, threshold, signatories, shares, authorizedAddrList, tsList)
+        ).revertedWith('Mismatch signatories and shares')
     })
 
     describe('Approve signatory', () => {
@@ -60,7 +70,9 @@ describe('BtcVault', () => {
             const threshold = 30
             const signatories = [signatory1.address, signatory2.address]
             const shares = [3000, 7000]
-            await btcVault.initializeVault(name, threshold, signatories, shares)
+            const authorizedAddrList: any[] = []
+            const tsList: any[] = []
+            await btcVault.initializeVault(name, threshold, signatories, shares, authorizedAddrList, tsList)
         })
 
         it('Approve by signatory should work', async () => {
@@ -114,7 +126,9 @@ describe('BtcVault', () => {
             const threshold = 30
             const signatories = [signatory1.address, signatory2.address]
             const shares = [3000, 7000]
-            await btcVault.initializeVault(name, threshold, signatories, shares)
+            const authorizedAddrList: any[] = []
+            const tsList: any[] = []
+            await btcVault.initializeVault(name, threshold, signatories, shares, authorizedAddrList, tsList)
 
             const vaultId = 0
             const btcPubkey = ethers.utils.randomBytes(32)

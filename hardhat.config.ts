@@ -49,7 +49,7 @@ const config: HardhatUserConfig = {
     contractSizer: {
         alphaSort: true,
         disambiguatePaths: false,
-        runOnCompile: false,
+        runOnCompile: true,
         strict: true,
     }
 }

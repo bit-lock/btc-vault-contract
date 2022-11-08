@@ -51,8 +51,8 @@ contract BtcVault {
     /* ========== EVENTS ========== */
 
     event Initialized(uint256 indexed vaultId, Vault vault);
-    event Added(uint256 indexed vaultId, address signatory, uint256 share);
-    event Edited(uint256 indexed vaultId, address signatory, uint256 oldShare, uint256 newShare);
+    event Added(uint256 indexed vaultId, address signatory, uint16 share);
+    event Edited(uint256 indexed vaultId, address signatory, uint16 oldShare, uint16 newShare);
     event Accepted(uint256 indexed vaultId, address signatory, bytes32 btcPubkey);
     event Finalized(uint256 indexed vaultId);
 
@@ -62,7 +62,7 @@ contract BtcVault {
         string memory name,
         uint8 threshold,
         address[] memory signatories,
-        uint256[] memory shares,
+        uint16[] memory shares,
         address[] memory authorizedAddrList,
         TimelockThreshold[] memory tsList
     ) external {
@@ -108,13 +108,13 @@ contract BtcVault {
     function editSignatories(
         uint256 vaultId,
         address[] memory signatories,
-        uint256[] memory shares
+        uint16[] memory shares
     ) public onlyInitiator(vaultId) isDraft(vaultId) {
         uint256 _totalShare = vaults[vaultId].totalShare;
         for (uint256 i = 0; i < signatories.length; i++) {
             require(signatoryShares[vaultId].contains(signatories[i]), 'Non-existent signatory');
-            uint256 oldShare = signatoryShares[vaultId].get(signatories[i]);
-            uint256 newShare = shares[i];
+            uint16 oldShare = uint16(signatoryShares[vaultId].get(signatories[i]));
+            uint16 newShare = shares[i];
             _totalShare = _totalShare.sub(oldShare).add(newShare);
 
             emit Edited(vaultId, signatories[i], oldShare, newShare);
@@ -154,7 +154,7 @@ contract BtcVault {
     function _addSignatory(
         uint256 vaultId,
         address signatory,
-        uint256 share
+        uint16 share
     ) private {
         signatoryShares[vaultId].set(signatory, share);
         signatoryVaults[signatory].add(vaultId);
@@ -173,19 +173,19 @@ contract BtcVault {
         view
         returns (
             address[] memory,
-            uint256[] memory,
+            uint16[] memory,
             bytes32[] memory
         )
     {
         uint256 signatorySize = signatoryShares[vaultId].length();
         address[] memory signatories = new address[](signatorySize);
-        uint256[] memory shares = new uint256[](signatorySize);
+        uint16[] memory shares = new uint16[](signatorySize);
         bytes32[] memory btcPubkeys = new bytes32[](signatorySize);
 
         for (uint256 i = 0; i < signatorySize; i++) {
             (address signatory, uint256 share) = signatoryShares[vaultId].at(i);
             signatories[i] = signatory;
-            shares[i] = share;
+            shares[i] = uint16(share);
             bytes32 signatoryBytes32 = bytes32(bytes20(signatory));
             if (signatoryPubkeys[vaultId].contains(signatoryBytes32)) {
                 btcPubkeys[i] = signatoryPubkeys[vaultId].get(signatoryBytes32);

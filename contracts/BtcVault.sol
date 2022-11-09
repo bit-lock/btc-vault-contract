@@ -26,7 +26,7 @@ contract BtcVault {
         address initiator;
         uint16 threshold;
         bytes1 status;
-        uint256 totalShare;
+        uint16 totalShare;
     }
 
     struct TimelockThreshold {
@@ -60,7 +60,7 @@ contract BtcVault {
 
     function initializeVault(
         string memory name,
-        uint8 threshold,
+        uint16 threshold,
         address[] memory signatories,
         uint16[] memory shares,
         address[] memory authorizedAddrList,
@@ -75,7 +75,7 @@ contract BtcVault {
 
         for (uint256 i = 0; i < signatories.length; i++) {
             _addSignatory(vaultId, signatories[i], shares[i]);
-            vault.totalShare = vault.totalShare.add(shares[i]);
+            vault.totalShare = vault.totalShare + shares[i];
         }
 
         if (tsList.length >= 1) {
@@ -110,12 +110,12 @@ contract BtcVault {
         address[] memory signatories,
         uint16[] memory shares
     ) public onlyInitiator(vaultId) isDraft(vaultId) {
-        uint256 _totalShare = vaults[vaultId].totalShare;
+        uint16 _totalShare = vaults[vaultId].totalShare;
         for (uint256 i = 0; i < signatories.length; i++) {
             require(signatoryShares[vaultId].contains(signatories[i]), 'Non-existent signatory');
             uint16 oldShare = uint16(signatoryShares[vaultId].get(signatories[i]));
             uint16 newShare = shares[i];
-            _totalShare = _totalShare.sub(oldShare).add(newShare);
+            _totalShare = _totalShare - oldShare + newShare;
 
             emit Edited(vaultId, signatories[i], oldShare, newShare);
         }

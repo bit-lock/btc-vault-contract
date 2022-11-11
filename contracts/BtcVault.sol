@@ -35,10 +35,18 @@ contract BtcVault {
         uint16 threshold;
     }
 
+    struct WithdrawRequest {
+        bytes scriptPubkey;
+        uint64 amount;
+        uint32 fee;
+    }
+
     /* ========== STATE VARIABLES ========== */
 
     Vault[] public vaults;
     TimelockThreshold[] public timelockThresholds;
+    // vaultId => proposalId
+    mapping(uint256 => uint256) public nextProposalId;
     // vaultId => signatory => BTC public key
     mapping(uint256 => EnumerableMap.Bytes32ToBytes32Map) private signatoryPubkeys;
     // vaultId => signatory => share
@@ -47,6 +55,10 @@ contract BtcVault {
     mapping(uint256 => EnumerableSet.AddressSet) private authorizedAddresses;
     // signatory => vaultId set
     mapping(address => EnumerableSet.UintSet) private signatoryVaults;
+    // vaultId => proposalId => withdraw request
+    mapping(uint256 => mapping(uint256 => WithdrawRequest)) private withdrawRequests;
+    // vaultId => proposalId => signatory => Schnorr signatures
+    mapping(uint256 => mapping(uint256 => mapping(address => bytes[]))) private withdrawRequestSigs;
 
     /* ========== EVENTS ========== */
 
@@ -55,6 +67,8 @@ contract BtcVault {
     event Edited(uint256 indexed vaultId, address signatory, uint16 oldShare, uint16 newShare);
     event Accepted(uint256 indexed vaultId, address signatory, bytes32 btcPubkey);
     event Finalized(uint256 indexed vaultId);
+    event WithdrawalInitiated(uint256 indexed vaultId, uint256 proposalId, address authorizedOrSignatory);
+    event WithdrawalApproved(uint256 indexed vaultId, uint256 proposalId, address signatory);
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
@@ -147,9 +161,31 @@ contract BtcVault {
         emit Finalized(vaultId);
     }
 
-    function initiateWithdrawal(uint256 vaultId) external onlyAuthorized(vaultId) {}
+    function initiateWithdrawal(uint256 vaultId, WithdrawRequest memory request) external onlyAuthorized(vaultId) {
+        require(request.scriptPubkey.length == 35, 'Invalid scriptPubkey');
 
-    function approveWithdrawal(uint256 vaultId) external {}
+        uint256 proposalId = nextProposalId[vaultId];
+        withdrawRequests[vaultId][proposalId] = request;
+        nextProposalId[vaultId]++;
+
+        emit WithdrawalInitiated(vaultId, proposalId, msg.sender);
+    }
+
+    function approveWithdrawal(
+        uint256 vaultId,
+        uint256 proposalId,
+        bytes[] memory sigs
+    ) external onlySignatory(vaultId) {
+        require(proposalId < nextProposalId[vaultId], 'Invalid proposalId');
+        require(withdrawRequestSigs[vaultId][proposalId][msg.sender].length == 0, 'Already approved');
+
+        for (uint256 i = 0; i < sigs.length; i++) {
+            require(sigs[i].length == 65, 'Invalid sig');
+            withdrawRequestSigs[vaultId][proposalId][msg.sender].push(sigs[i]);
+        }
+
+        emit WithdrawalApproved(vaultId, proposalId, msg.sender);
+    }
 
     function _addSignatory(
         uint256 vaultId,
@@ -212,6 +248,18 @@ contract BtcVault {
         return authorizedAddresses[vaultId].values();
     }
 
+    function getWithdrawRequest(uint256 vaultId, uint256 proposalId) external view returns (WithdrawRequest memory) {
+        return withdrawRequests[vaultId][proposalId];
+    }
+
+    function getWithdrawRequestSigs(
+        uint256 vaultId,
+        uint256 proposalId,
+        address signatory
+    ) external view returns (bytes[] memory) {
+        return withdrawRequestSigs[vaultId][proposalId][signatory];
+    }
+
     /* ========== MODIFIERS ========== */
 
     modifier onlyInitiator(uint256 vaultId) {
@@ -225,7 +273,10 @@ contract BtcVault {
     }
 
     modifier onlyAuthorized(uint256 vaultId) {
-        require(authorizedAddresses[vaultId].contains(msg.sender), 'Invalid authorized address');
+        require(
+            authorizedAddresses[vaultId].contains(msg.sender) || signatoryShares[vaultId].contains(msg.sender),
+            'Invalid authorized address'
+        );
         _;
     }
 

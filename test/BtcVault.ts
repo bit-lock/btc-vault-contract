@@ -260,7 +260,7 @@ describe('BtcVault', () => {
                 request = [scriptPubkey, amount, fee]
                 await btcVault.connect(signatory1).initiateWithdrawal(vaultId, request)
 
-                sigList = Array.from({ length: 100 }, () => `0x${crypto.randomBytes(65).toString('hex')}`)
+                sigList = Array.from({ length: 100 }, () => `0x${crypto.randomBytes(64).toString('hex')}`)
             })
 
             it('Approve withdrawal by signatory should work', async () => {

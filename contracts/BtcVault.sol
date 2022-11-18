@@ -180,7 +180,7 @@ contract BtcVault {
         require(withdrawRequestSigs[vaultId][proposalId][msg.sender].length == 0, 'Already approved');
 
         for (uint256 i = 0; i < sigs.length; i++) {
-            require(sigs[i].length == 65, 'Invalid sig');
+            require(sigs[i].length == 64, 'Invalid sig');
             withdrawRequestSigs[vaultId][proposalId][msg.sender].push(sigs[i]);
         }
 
